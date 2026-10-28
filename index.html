@@ -1,0 +1,609 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pakistan Parks | WebGIS</title>
+
+    <link rel="stylesheet"
+          href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            font-family: Arial, sans-serif;
+            background: #f1f5f2;
+            color: #20332a;
+        }
+
+        header {
+            background: #14532d;
+            color: white;
+            padding: 24px 5%;
+        }
+
+        header h1 {
+            margin: 0 0 8px;
+        }
+
+        header p {
+            margin: 0;
+            color: #dcfce7;
+        }
+
+        main {
+            max-width: 1250px;
+            margin: 25px auto;
+            padding: 0 18px;
+        }
+
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .stat, .panel {
+            background: white;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 3px 12px #0000000d;
+        }
+
+        .stat h3 {
+            margin: 0 0 10px;
+            color: #64748b;
+            font-size: 14px;
+        }
+
+        .stat strong {
+            font-size: 26px;
+            color: #166534;
+        }
+
+        .filters {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+
+        input, select, button {
+            width: 100%;
+            padding: 11px;
+            border: 1px solid #d1d5db;
+            border-radius: 7px;
+            font-size: 14px;
+        }
+
+        button {
+            border: none;
+            background: #15803d;
+            color: white;
+            cursor: pointer;
+            font-weight: bold;
+        }
+
+        button:hover {
+            background: #166534;
+        }
+
+        .secondary {
+            background: #64748b;
+        }
+
+        .edit-btn {
+            padding: 7px 12px;
+            width: auto;
+        }
+
+        .panel {
+            margin-bottom: 22px;
+        }
+
+        .panel h2 {
+            margin-top: 0;
+        }
+
+        #map {
+            height: 430px;
+            border-radius: 9px;
+            z-index: 1;
+        }
+
+        .form-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 14px;
+        }
+
+        label {
+            display: block;
+            font-size: 13px;
+            font-weight: bold;
+            margin-bottom: 6px;
+        }
+
+        .field {
+            margin-bottom: 12px;
+        }
+
+        .form-buttons {
+            display: flex;
+            gap: 10px;
+            margin-top: 8px;
+        }
+
+        .form-buttons button {
+            flex: 1;
+        }
+
+        #message {
+            margin: 12px 0;
+            font-weight: bold;
+            overflow-wrap: anywhere;
+        }
+
+        .table-wrap {
+            overflow-x: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            min-width: 600px;
+        }
+
+        th, td {
+            text-align: left;
+            padding: 12px;
+            border-bottom: 1px solid #e5e7eb;
+        }
+
+        th {
+            background: #ecfdf5;
+            color: #166534;
+        }
+
+        footer {
+            text-align: center;
+            padding: 20px;
+            color: #64748b;
+        }
+    </style>
+</head>
+
+<body>
+<header>
+    <h1>🌳 Pakistan Parks WebGIS</h1>
+    <p>Interactive Park Mapping and Spatial Information System</p>
+</header>
+
+<main>
+    <section class="stats">
+        <div class="stat">
+            <h3>Total Parks</h3>
+            <strong id="totalParks">0</strong>
+        </div>
+        <div class="stat">
+            <h3>Cities</h3>
+            <strong id="totalCities">0</strong>
+        </div>
+        <div class="stat">
+            <h3>Park Types</h3>
+            <strong id="totalTypes">0</strong>
+        </div>
+    </section>
+
+    <section class="panel">
+        <h2>Find Parks</h2>
+        <div class="filters">
+            <input id="search" placeholder="Search park name...">
+
+            <select id="cityFilter">
+                <option value="">All Cities</option>
+            </select>
+
+            <select id="typeFilter">
+                <option value="">All Park Types</option>
+            </select>
+
+            <button id="resetFilters" type="button">Reset Filters</button>
+        </div>
+        <p id="message" role="status"></p>
+    </section>
+
+    <section class="panel">
+        <h2>Interactive Map</h2>
+        <div id="map"></div>
+    </section>
+
+    <section class="panel">
+        <h2 id="formTitle">Add a New Park</h2>
+
+        <form id="parkForm">
+            <input type="hidden" id="parkId">
+
+            <div class="form-grid">
+                <div class="field">
+                    <label for="parkName">Park Name</label>
+                    <input id="parkName" required maxlength="150"
+                           placeholder="e.g. Test Park">
+                </div>
+
+                <div class="field">
+                    <label for="parkType">Park Type</label>
+                    <input id="parkType" required maxlength="100"
+                           placeholder="e.g. Public Park">
+                </div>
+
+                <div class="field">
+                    <label for="parkCity">City</label>
+                    <input id="parkCity" required maxlength="100"
+                           placeholder="e.g. Islamabad">
+                </div>
+
+                <div class="field">
+                    <label for="latitude">Latitude</label>
+                    <input id="latitude" type="number" step="any"
+                           min="-90" max="90" required
+                           placeholder="33.6844">
+                </div>
+
+                <div class="field">
+                    <label for="longitude">Longitude</label>
+                    <input id="longitude" type="number" step="any"
+                           min="-180" max="180" required
+                           placeholder="73.0479">
+                </div>
+            </div>
+
+            <div class="form-buttons">
+                <button id="submitButton" type="submit">Add Park</button>
+                <button id="cancelEdit" class="secondary"
+                        type="button" hidden>Cancel Edit</button>
+            </div>
+        </form>
+    </section>
+
+    <section class="panel">
+        <h2>Park Records</h2>
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Park Name</th>
+                        <th>Type</th>
+                        <th>City</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody id="parksTable">
+                    <tr>
+                        <td colspan="5">Loading parks...</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </section>
+</main>
+
+<footer>Pakistan Parks WebGIS | Database-Driven Dynamic WebGIS</footer>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+<script>
+"use strict";
+
+const $ = id => document.getElementById(id);
+
+const map = L.map("map").setView([30.3753, 69.3451], 5);
+
+L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    attribution: "&copy; OpenStreetMap contributors",
+    maxZoom: 19
+}).addTo(map);
+
+const markers = L.featureGroup().addTo(map);
+
+let allParks = [];
+let filterTimer;
+
+function showMessage(message, isError = false) {
+    $("message").textContent = message;
+    $("message").style.color = isError ? "#b91c1c" : "#166534";
+}
+
+async function readResponse(response) {
+    const text = await response.text();
+
+    let data;
+    try {
+        data = text ? JSON.parse(text) : null;
+    } catch {
+        throw new Error(
+            "Server ne valid JSON nahi bheja. server.js aur terminal check karein."
+        );
+    }
+
+    if (!response.ok) {
+        throw new Error(data?.error || `Request failed (${response.status})`);
+    }
+
+    if (data === null) {
+        throw new Error("Server se empty response mila.");
+    }
+
+    return data;
+}
+
+function fillSelect(id, values, firstLabel) {
+    const select = $(id);
+    const previous = select.value;
+
+    select.replaceChildren(new Option(firstLabel, ""));
+
+    values.forEach(value => {
+        select.add(new Option(value, value));
+    });
+
+    if (values.includes(previous)) {
+        select.value = previous;
+    }
+}
+
+function updateFilterOptions(parks) {
+    const cities = [...new Set(parks.map(p => p.city).filter(Boolean))].sort();
+    const types = [...new Set(parks.map(p => p.park_type).filter(Boolean))].sort();
+
+    fillSelect("cityFilter", cities, "All Cities");
+    fillSelect("typeFilter", types, "All Park Types");
+}
+
+function updateStats(parks) {
+    $("totalParks").textContent = parks.length;
+    $("totalCities").textContent =
+        new Set(parks.map(p => p.city).filter(Boolean)).size;
+    $("totalTypes").textContent =
+        new Set(parks.map(p => p.park_type).filter(Boolean)).size;
+}
+
+function renderMap(parks) {
+    markers.clearLayers();
+
+    parks.forEach(park => {
+        const lat = Number(park.latitude);
+        const lon = Number(park.longitude);
+
+        if (!Number.isFinite(lat) || !Number.isFinite(lon)) return;
+        if (lat < -90 || lat > 90 || lon < -180 || lon > 180) return;
+
+        L.marker([lat, lon])
+            .bindPopup(
+                `<strong>${escapeHTML(park.name)}</strong><br>` +
+                `${escapeHTML(park.park_type)}<br>` +
+                `${escapeHTML(park.city)}`
+            )
+            .addTo(markers);
+    });
+
+    if (markers.getLayers().length > 0) {
+        map.fitBounds(markers.getBounds(), { padding: [25, 25], maxZoom: 13 });
+    } else {
+        map.setView([30.3753, 69.3451], 5);
+    }
+}
+
+function escapeHTML(value) {
+    return String(value ?? "").replace(/[&<>"']/g, char => ({
+        "&": "&amp;",
+        "<": "&lt;",
+        ">": "&gt;",
+        '"': "&quot;",
+        "'": "&#39;"
+    })[char]);
+}
+
+function renderTable(parks) {
+    const tbody = $("parksTable");
+    tbody.replaceChildren();
+
+    if (!parks.length) {
+        const row = tbody.insertRow();
+        const cell = row.insertCell();
+        cell.colSpan = 5;
+        cell.textContent = "No parks found.";
+        return;
+    }
+
+    parks.forEach(park => {
+        const row = tbody.insertRow();
+
+        [park.id, park.name, park.park_type, park.city].forEach(value => {
+            row.insertCell().textContent = value ?? "";
+        });
+
+        const actionCell = row.insertCell();
+        const editButton = document.createElement("button");
+        editButton.textContent = "Edit";
+        editButton.className = "edit-btn";
+        editButton.type = "button";
+        editButton.addEventListener("click", () => editPark(park.id));
+        actionCell.appendChild(editButton);
+    });
+}
+
+async function loadParks() {
+    const params = new URLSearchParams();
+
+    if ($("cityFilter").value) {
+        params.set("city", $("cityFilter").value);
+    }
+
+    if ($("typeFilter").value) {
+        params.set("park_type", $("typeFilter").value);
+    }
+
+    if ($("search").value.trim()) {
+        params.set("search", $("search").value.trim());
+    }
+
+    try {
+        showMessage("Loading park records...");
+
+        const response = await fetch("/api/parks?" + params.toString());
+        const parks = await readResponse(response);
+
+        if (!Array.isArray(parks)) {
+            throw new Error("API response list format mein nahi hai.");
+        }
+
+        allParks = parks;
+        renderMap(parks);
+        renderTable(parks);
+        updateStats(parks);
+        showMessage(`${parks.length} park record(s) loaded successfully.`);
+    } catch (error) {
+        console.error("Load parks error:", error);
+        showMessage(error.message, true);
+
+        $("parksTable").replaceChildren();
+        const row = $("parksTable").insertRow();
+        const cell = row.insertCell();
+        cell.colSpan = 5;
+        cell.textContent = "Could not load parks. Check server.js and database.";
+    }
+}
+
+async function loadFilterOptions() {
+    try {
+        const response = await fetch("/api/parks");
+        const parks = await readResponse(response);
+
+        if (!Array.isArray(parks)) throw new Error("Invalid API data.");
+
+        updateFilterOptions(parks);
+    } catch (error) {
+        console.error("Filter options error:", error);
+    }
+}
+
+$("parkForm").addEventListener("submit", async event => {
+    event.preventDefault();
+
+    const id = $("parkId").value;
+    const payload = {
+        name: $("parkName").value.trim(),
+        park_type: $("parkType").value.trim(),
+        city: $("parkCity").value.trim(),
+        latitude: Number($("latitude").value),
+        longitude: Number($("longitude").value)
+    };
+
+    if (!payload.name || !payload.park_type || !payload.city) {
+        showMessage("Please fill in all required fields.", true);
+        return;
+    }
+
+    if (
+        $("latitude").value.trim() === "" ||
+        $("longitude").value.trim() === "" ||
+        !Number.isFinite(payload.latitude) ||
+        !Number.isFinite(payload.longitude) ||
+        payload.latitude < -90 || payload.latitude > 90 ||
+        payload.longitude < -180 || payload.longitude > 180
+    ) {
+        showMessage("Enter valid latitude and longitude.", true);
+        return;
+    }
+
+    const button = $("submitButton");
+    button.disabled = true;
+
+    try {
+        const response = await fetch(
+            id ? `/api/parks/${encodeURIComponent(id)}` : "/api/parks",
+            {
+                method: id ? "PUT" : "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload)
+            }
+        );
+
+        await readResponse(response);
+
+        showMessage(id ? "Park updated successfully!" : "Park added successfully!");
+        $("parkForm").reset();
+        $("parkId").value = "";
+        $("formTitle").textContent = "Add a New Park";
+        $("submitButton").textContent = "Add Park";
+        $("cancelEdit").hidden = true;
+
+        await loadFilterOptions();
+        await loadParks();
+    } catch (error) {
+        console.error("Save park error:", error);
+        showMessage(error.message, true);
+    } finally {
+        button.disabled = false;
+    }
+});
+
+function editPark(id) {
+    const park = allParks.find(p => String(p.id) === String(id));
+    if (!park) return;
+
+    $("parkId").value = park.id;
+    $("parkName").value = park.name ?? "";
+    $("parkType").value = park.park_type ?? "";
+    $("parkCity").value = park.city ?? "";
+    $("latitude").value = park.latitude ?? "";
+    $("longitude").value = park.longitude ?? "";
+
+    $("formTitle").textContent = "Update Park";
+    $("submitButton").textContent = "Update Park";
+    $("cancelEdit").hidden = false;
+
+    $("parkForm").scrollIntoView({ behavior: "smooth" });
+}
+
+$("cancelEdit").addEventListener("click", () => {
+    $("parkForm").reset();
+    $("parkId").value = "";
+    $("formTitle").textContent = "Add a New Park";
+    $("submitButton").textContent = "Add Park";
+    $("cancelEdit").hidden = true;
+    showMessage("");
+});
+
+$("cityFilter").addEventListener("change", loadParks);
+$("typeFilter").addEventListener("change", loadParks);
+
+$("search").addEventListener("input", () => {
+    clearTimeout(filterTimer);
+    filterTimer = setTimeout(loadParks, 300);
+});
+
+$("resetFilters").addEventListener("click", () => {
+    $("cityFilter").value = "";
+    $("typeFilter").value = "";
+    $("search").value = "";
+    loadParks();
+});
+
+async function initialize() {
+    await loadFilterOptions();
+    await loadParks();
+}
+
+initialize();
+</script>
+</body>
+</html>
